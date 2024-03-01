@@ -35,5 +35,8 @@ Your feedback will be much appreciated.
 
 **This is a basic implementation. One human three computers. **
 
+**The License is for the code, the IP as far as the game is concerned still belongs to me to the extent possible. I am giving the game to the world to play and implement freely non-commercially with attribution to me**
+
+
 
 
