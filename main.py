@@ -1,4 +1,6 @@
-# uncomment this line if running on colab or other notebooks else run pip install chess before you run the main.py file to install the chess library
+#Chaos Chess V.01 Alpha (C) Ajay Kumar 2024 Some Rights Reserved 
+
+# uncomment the next line if running on colab or other notebooks else run pip install chess before you run the main.py file to install the chess library
 # !pip install chess
 # Import necessary libraries
 import chess  # Chess library providing board management and move generation/validation
