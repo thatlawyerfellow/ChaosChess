@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chaos Chess - Web Edition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #2c3e50;
+            --text-color: #ecf0f1;
+            --board-light: #F0D9B5;
+            --board-dark: #B58863;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: var(--background-color);
+            color: var(--text-color);
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+            background-color: rgba(52, 73, 94, 0.8);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 1px;
+            background-color: #8B4513;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 40px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .square:hover {
+            transform: scale(1.05);
+        }
+        .white-square { background-color: var(--board-light); }
+        .black-square { background-color: var(--board-dark); }
+        .highlight { box-shadow: inset 0 0 0 3px var(--primary-color); }
+        .last-move { background-color: rgba(155, 199, 0, 0.41); }
+        .game-info {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 250px;
+        }
+        .info-box {
+            background-color: rgba(44, 62, 80, 0.7);
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .player-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+        .white { background-color: white; }
+        .black { background-color: black; }
+        #timer {
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #message {
+            min-height: 50px;
+            text-align: center;
+        }
+        .scorecard {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+        .modal-content {
+            background-color: var(--background-color);
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover,
+        .close:focus {
+            color: #fff;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="chess-board" id="chessBoard"></div>
+        <div class="game-info">
+            <div class="info-box">
+                <div class="player-info">
+                    <span>Player: <span id="player-name">You</span></span>
+                    <div id="player-color" class="player-color"></div>
+                </div>
+                <div class="player-info">
+                    <span>Computer</span>
+                    <div id="computer-color" class="player-color"></div>
+                </div>
+            </div>
+            <div class="info-box">
+                <div id="timer">05:00</div>
+            </div>
+            <div class="info-box scorecard">
+                <span>You: <span id="player-score">0</span></span>
+                <span>Computer: <span id="computer-score">0</span></span>
+            </div>
+            <button onclick="newGame()">New Game</button>
+            <button onclick="callPiece()">Call Piece</button>
+            <div id="message" class="info-box"></div>
+        </div>
+    </div>
+
+    <div id="gameOverModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Game Over</h2>
+            <p id="gameOverMessage"></p>
+            <button onclick="newGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+    <script>
+        let game = new Chess();
+        let selectedSquare = null;
+        let calledPiece = null;
+        let playerColor = 'w';
+        let lastMove = null;
+        let timer;
+        let timeLeft;
+        let playerScore = 0;
+        let computerScore = 0;
+
+        const pieceValues = { 'p': 1, 'n': 3, 'b': 3, 'r': 5, 'q': 9, 'k': 0 };
+        const pieceUnicode = {
+            'k': '♔', 'q': '♕', 'r': '♖', 'b': '♗', 'n': '♘', 'p': '♙',
+            'K': '♚', 'Q': '♛', 'R': '♜', 'B': '♝', 'N': '♞', 'P': '♟'
+        };
+
+        function createBoard() {
+            const chessBoard = document.getElementById('chessBoard');
+            chessBoard.innerHTML = '';
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    const square = document.createElement('div');
+                    square.classList.add('square');
+                    square.classList.add((i + j) % 2 === 0 ? 'white-square' : 'black-square');
+                    square.dataset.square = String.fromCharCode(97 + j) + (playerColor === 'w' ? 8 - i : i + 1);
+                    square.addEventListener('click', handleSquareClick);
+                    chessBoard.appendChild(square);
+                }
+            }
+            updateBoard();
+        }
+
+        function updateBoard() {
+            const squares = document.querySelectorAll('.square');
+            squares.forEach(square => {
+                const piece = game.get(square.dataset.square);
+                square.textContent = piece ? pieceUnicode[piece.color === 'w' ? piece.type.toUpperCase() : piece.type] : '';
+                square.classList.remove('last-move');
+            });
+            if (lastMove) {
+                document.querySelector(`[data-square="${lastMove.from}"]`).classList.add('last-move');
+                document.querySelector(`[data-square="${lastMove.to}"]`).classList.add('last-move');
+            }
+        }
+
+        function handleSquareClick(event) {
+            const clickedSquare = event.target.dataset.square;
+            if (selectedSquare === null) {
+                const piece = game.get(clickedSquare);
+                if (piece && piece.color === playerColor && isPieceAllowed(piece)) {
+                    selectedSquare = clickedSquare;
+                    highlightSquare(clickedSquare);
+                }
+            } else {
+                makeMove(selectedSquare, clickedSquare);
+            }
+        }
+
+        function highlightSquare(square) {
+            document.querySelectorAll('.square').forEach(sq => sq.classList.remove('highlight'));
+            document.querySelector(`[data-square="${square}"]`).classList.add('highlight');
+        }
+
+        function isPieceAllowed(piece) {
+            if (!calledPiece) return true;
+            const pieceTypes = { 'p': 'Pawn', 'n': 'Knight', 'b': 'Bishop', 'r': 'Rook', 'q': 'Queen', 'k': 'King' };
+            return pieceTypes[piece.type.toLowerCase()] === calledPiece;
+        }
+
+        function makeMove(from, to) {
+            const move = game.move({ from, to, promotion: 'q' });
+            if (move) {
+                updateBoard();
+                selectedSquare = null;
+                document.querySelectorAll('.square').forEach(sq => sq.classList.remove('highlight'));
+                calledPiece = null;
+                lastMove = move;
+                updateScore(move);
+                document.getElementById('message').textContent = `You moved ${move.piece.toUpperCase()} from ${move.from} to ${move.to}`;
+                setTimeout(computerMove, 500);
+            } else {
+                selectedSquare = null;
+                document.querySelectorAll('.square').forEach(sq => sq.classList.remove('highlight'));
+                document.getElementById('message').textContent = 'Invalid move. Try again.';
+            }
+        }
+
+        function computerMove() {
+            const moves = game.moves({ verbose: true });
+            if (moves.length > 0) {
+                const randomMove = moves[Math.floor(Math.random() * moves.length)];
+                game.move(randomMove);
+                updateBoard();
+                lastMove = randomMove;
+                updateScore(randomMove);
+                document.getElementById('message').textContent = `Computer moved ${randomMove.piece.toUpperCase()} from ${randomMove.from} to ${randomMove.to}`;
+            }
+            if (game.game_over()) {
+                handleGameOver();
+            }
+        }
+
+        function updateScore(move) {
+            if (move.captured) {
+                if (move.color === playerColor) {
+                    playerScore += pieceValues[move.captured];
+                } else {
+                    computerScore += pieceValues[move.captured];
+                }
+                document.getElementById('player-score').textContent = playerScore;
+                document.getElementById('computer-score').textContent = computerScore;
+            }
+        }
+
+        function handleGameOver() {
+            clearInterval(timer);
+            let message = 'Game Over. ';
+            if (game.in_checkmate()) {
+                message += game.turn() === 'w' ? 'Black wins by checkmate!' : 'White wins by checkmate!';
+                updateFinalScore(game.turn() === 'w' ? 'b' : 'w');
+            } else if (game.in_draw()) {
+                message += "It's a draw!";
+            } else if (game.in_stalemate()) {
+                message += 'Stalemate!';
+            } else if (game.in_threefold_repetition()) {
+                message += 'Draw by threefold repetition!';
+            } else if (game.insufficient_material()) {
+                message += 'Draw due to insufficient material!';
+            } else {
+                message += timeLeft <= 0 ? 'Time\'s up! ' : '';
+                updateFinalScore(playerScore >= computerScore ? playerColor : (playerColor === 'w' ? 'b' : 'w'));
+            }
+            showModal(message);
+        }
+
+        function updateFinalScore(winner) {
+            if (winner === playerColor) {
+                playerScore += 5; // Bonus for winning
+            } else {
+                computerScore += 5; // Bonus for winning
+            }
+            document.getElementById('player-score').textContent = playerScore;
+            document.getElementById('computer-score').textContent = computerScore;
+        }
+
+        function newGame() {
+            game = new Chess();
+            selectedSquare = null;
+            calledPiece = null;
+            lastMove = null;
+            playerColor = Math.random() < 0.5 ? 'w' : 'b';
+            playerScore = 0;
+            computerScore = 0;
+            document.getElementById('player-score').textContent = '0';
+            document.getElementById('computer-score').textContent = '0';
+            createBoard();
+            updatePlayerColors();
+            document.getElementById('message').textContent = `New game started! You are playing as ${playerColor === 'w' ? 'White' : 'Black'}.`;
+            if (playerColor === 'b') {
+                setTimeout(computerMove, 500);
+            }
+            startTimer();
+            hideModal();
+        }
+
+        function updatePlayerColors() {
+            document.getElementById('player-color').className = `player-color ${playerColor === 'w' ? 'white' : 'black'}`;
+            document.getElementById('computer-color').className = `player-color ${playerColor === 'w' ? 'black' : 'white'}`;
+        }
+
+        function callPiece() {
+            const pieces = ['Pawn', 'Knight', 'Bishop', 'Rook', 'Queen', 'King'];
+            const validPieces = pieces.filter(piece => 
+                game.moves({ verbose: true }).some(move => 
+                    move.piece.toUpperCase() === piece[0] && 
+                    game.get(move.from).color === playerColor
+                )
+            );
+            if (validPieces.length > 0) {
+                calledPiece = validPieces[Math.floor(Math.random() * validPieces.length)];
+                document.getElementById('message').textContent = `Your spotter calls: ${calledPiece}. You must move this piece type if possible.`;
+            } else {
+                document.getElementById('message').textContent = "No valid pieces to call. You can move any piece.";
+            }
+        }
+
+        function startTimer() {
+            clearInterval(timer);
+            timeLeft = 5 * 60; // 5 minutes in seconds
+            updateTimerDisplay();
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    handleGameOver();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            document.getElementById('timer').textContent = 
+                `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function showModal(message) {
+            const modal = document.getElementById('gameOverModal');
+            const gameOverMessage = document.getElementById('gameOverMessage');
+            gameOverMessage.textContent = message;
+            modal.style.display = "block";
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('gameOverModal');
+            modal.style.display = "none";
+        }
+
+        // Close modal when clicking on <span> (x)
+        document.querySelector('.close').onclick = function() {
+            hideModal();
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('gameOverModal');
+            if (event.target == modal) {
+                hideModal();
+            }
+        }
+
+        // Initialize the game
+        newGame();
+    </script>
+</body>
+</html>
